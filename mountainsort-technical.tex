@@ -16,7 +16,9 @@
 
 \maketitle
 
-\section{Whitening}
+\section{Processing pipeline for a small number of channels}
+
+\subsection{Whitening}
 
 The goal of whitening is to remove correlations between channels and normalize each channel to have unit variance. Let $X_{m,n}$ be the bandpass filtered, non-whitened signal for channel $m$ at the $n$th timepoint ($m=1,\dots,M$ and $n=1,\dots,N$). The covariance matrix is
 $$C=X X',$$
@@ -42,7 +44,7 @@ disp(A_tilde-U*V'); % Should be zero
 
 After whitening, since each channel will have unit variance, the detection threshold may be set in units of standard deviations from the mean.
 
-\section{Detection}
+\subsection{Detection}
 
 The purpose of detection is to identify timepoints where spiking events may have occurred. The output is an array of timepoints ideally located at the peak amplitudes of the spikes. Here we focus on the case where we are detecting only positive amplitude spikes on a single channel, but the method can easily be adapted to handle spikes in the absolute value of the signal across one or more channels.
 
@@ -103,17 +105,25 @@ end
 \includegraphics[width=3in]{test_sample_detect.png}
 \end{figure}
 
-\section{Feature extraction}
+\subsection{Feature extraction}
 
 Prior to sorting of events, dimension reduction via principal component (PCA) feature extraction is performed. There are two primary advantages. The first is simply computational as the subsequent steps are substantially more efficient when operating in, for example, $12$ dimensions rather than $M\times T$ dimensions where $M$ is the number of channels and $T$ is the number of time steps in an extracted event clip (centered at the detection timepoint). The second advantage is reduction of noise and artifacts, and to some degree the problem of multiple events occurring within the time window. This is because the principal components primarily capture the features that are common to large numbers of events.
 
 Let $C$ be the $MT \times L$ array of extracted event clips, where $MT$ is the vectorized length of a single clips, and $L$ is the number of detected events. Principal components are extracted using eigenvalue decomposition. If $D$ is the diagonal matrix of $MT$ eigenvalues of $XX'$ in descending order and $U$ is the $M\times M$ matrix of corresponding eigenvectors in columns, then the $M\times N$ matrix of PCA features is given by $\tilde{F}=U'D$. The first $n_{\text{features}}$ rows of $M$, denoted by $F$, is the $n_{\text{features}}\times N$ array of features which is the input to the subsequent clustering steps.
 
-\section{Clustering in shells}
+\subsection{Clustering in shells}
 
-Event clustering is a central step in spike sorting. The goal
+Event clustering is a central step in spike sorting. The goal is to provide integer labels to events such that ideally (a) spikes from the same neuron are labeled the same and (b) spikes with the same label arise from the same neuron. The former criterion corresponds to proper splitting of clusters, and the latter to proper merging. In addition to false splitting and false merging, there are three kinds of errors that relate to the separation of signal and noise. First, clusters of pure noise may be present. Second, pure noise or outlier events may be included in a cluster which otherwise corresponds to a unique neuron. Finally, events may be misclassified based on corruption by noise or artifact.
 
-\section{Shell merging}
+The choice of detection threshold is crucial for separating signal from noise. If the threshold is set too high, low amplitude clusters and/or events will be missed. On the other hand, if the threshold is too low then noise clusters will be detected, and more problematically, low amplitude clusters will be merged into the noise cluster. If two valid clusters are both merged into the same noise cluster then they may also be incorrectly merged with one another.
+
+To address these issues we propose a method to cluster in a series of amplitude shells followed by a cluster merging procedure. For now we handle the cause of strictly positive amplitude peaks, but the scheme may be adapted to the case where both positive and negative amplitude events are detected. Let $0=\mu_{1-}<\mu_{2-}<\dots<\mu_{n-}$ and $\mu_{1+}<\mu_{2+}<\dots<\mu_{n+}=\infty$ be a series of lower and upper amplitude bounds, respectively, with $\mu_{j-}<\mu_{j+}$. Let
+$$S_j=\{e_l:\mu_{j-}\leq a(e_l)<\mu_{j+}$$
+be the set of events in the $j$th shell, where $a(e_l)$ is the peak amplitude of the $l$th event. It is important that these shells are not mutually exclusive ($\mu_{j+}>\mu_{j+1-}$) so that merging in the subsequent step is possible.
+
+Clustering is then applied to each shell independently. We use the ISO-SPLIT algorithm [ref] which does not depend on any adjustable parameters, such as the \emph{a priori} number of clusters or a length scale. This is a density-based and model-free algorithm that assumes that each cluster is unimodal in the sense that it has a single region of peak density and that any two clusters are separated by a hyperplane of relatively lower density.
+
+\subsection{Shell merging}
 
 Clusters in adjacent shells are merged as follows. Let $S_j$ denote the set of events in the $j$th shell and let $C_{j,k}\subset S_j$ denote the $k$th cluster in the $j$th shell. Then we define the agreement between clusters $C_{j,k}$ and $C_{j+1,k'}$ to be
 $$\eta_{j,k,j+1,k'}=\frac{\#\{A\cap B\}}{\#\{A\cup B\}}$$ where
