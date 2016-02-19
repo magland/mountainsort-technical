@@ -7,6 +7,9 @@
 \usepackage{amsmath}
 \graphicspath{ {images/} }
 \usepackage{floatrow} %figure captions at bottom
+\usepackage{mathtools}
+\DeclarePairedDelimiter\ceil{\lceil}{\rceil}
+\DeclarePairedDelimiter\floor{\lfloor}{\rfloor}
 
 \title{Technical information about the inner workings of MountainSort}
 \author{Jeremy Magland and Alex Barnett}
@@ -16,7 +19,26 @@
 
 \maketitle
 
-\section{Processing pipeline for a small number of channels}
+\section{Notation and conventions}
+
+\begin{itemize}
+    \item[] $M$ - number of channels
+    \item[] $N$ - number of timepoints
+    \item[] $K$ - number of neurons/clusters
+    \item[] $T$ - extracted clip size (timepoints)
+    \item[] $L$ - number of events
+\end{itemize}
+
+We use $1$-based indexing for timepoints and neuron numbering. The center of an event clip of length $T$ timepoints in $\floor*{\frac{T+1}{2}}$.
+
+\section{Sorting pipeline for small arrays}
+
+\begin{figure}[h]
+\caption{Sorting pipeline for small and large electrode arrays}
+\includegraphics[width=4.5in]{pipelines.png}
+\end{figure}
+
+\subsection{Bandpass filter}
 
 \subsection{Whitening}
 
@@ -118,7 +140,7 @@ Event clustering is a central step in spike sorting. The goal is to provide inte
 The choice of detection threshold is crucial for separating signal from noise. If the threshold is set too high, low amplitude clusters and/or events will be missed. On the other hand, if the threshold is too low then noise clusters will be detected, and more problematically, low amplitude clusters will be merged into the noise cluster. If two valid clusters are both merged into the same noise cluster then they may also be incorrectly merged with one another.
 
 To address these issues we propose a method to cluster in a series of amplitude shells followed by a cluster merging procedure. For now we handle the cause of strictly positive amplitude peaks, but the scheme may be adapted to the case where both positive and negative amplitude events are detected. Let $0=\mu_{1-}<\mu_{2-}<\dots<\mu_{n-}$ and $\mu_{1+}<\mu_{2+}<\dots<\mu_{n+}=\infty$ be a series of lower and upper amplitude bounds, respectively, with $\mu_{j-}<\mu_{j+}$. Let
-$$S_j=\{e_l:\mu_{j-}\leq a(e_l)<\mu_{j+}$$
+$$S_j=\{e_l:\mu_{j-}\leq a(e_l)<\mu_{j+}\}$$
 be the set of events in the $j$th shell, where $a(e_l)$ is the peak amplitude of the $l$th event. It is important that these shells are not mutually exclusive ($\mu_{j+}>\mu_{j+1-}$) so that merging in the subsequent step is possible.
 
 Clustering is then applied to each shell independently. We use the ISO-SPLIT algorithm [ref] which does not depend on any adjustable parameters, such as the \emph{a priori} number of clusters or a length scale. This is a density-based and model-free algorithm that assumes that each cluster is unimodal in the sense that it has a single region of peak density and that any two clusters are separated by a hyperplane of relatively lower density.
@@ -138,5 +160,23 @@ and
 $$\frac{\#\{A\cap B''\}}{\#A}\geq\frac{\#\{A\cap B''\}}{\#\{A\cup B''\}}>\tau_{\text{merge}}\geq\frac{1}{2}$$
 where $A$, $B'$, and $B''$ are defined similar to as above. This implies that $B'=B''$, or equivalently $k'=k''$.
 
+\section{Sorting pipeline for large arrays}
+
+\subsection{Local neighborhoods}
+
+\subsection{Preprocessing and detection}
+
+\subsection{Clustering in local neighborhoods}
+
+\subsection{Cluster consolidation}
+
+The same neuron will typically be identified on more than one channel, and therefore redundancies need to be eliminated. In most cases, each neuron will have a primary electrode on which it loads with greater energy than on any other electrode. Therefore, if cluster $k$ was identified from channel $m_k$ and 
+$$\|W_k(m_k,\cdot)\|_2<\mu_{\text{con}} \|W_k(m^\prime,\cdot)\|_2$$
+where $W_k$ is the representative cluster
+and $m^\prime$ represents some other channel, then we assume that $k$ is a redundant cluster and can therefore be eliminated. Here, $\mu_{\text{con}}<1$ is a tolerance constant (e.g., $\mu_{\text{con}}=0.9$). In other words, we eliminate all clusters whose primary load channel is not the channel used to identify the cluster.
+
+The above heuristic handles most redundancies without the need to compare waveform shapes or firing time agreements. This is important since detection of the same neuron will certainly be of different quality on different channels. However, sometimes a neuron fires with around the same energy on two nearby electrodes. We therefore use a second criterion (in a second pass) to handle these situations. Let $n_{k_1}$ be the number of events classified as type $k_1$ and let $n_{k_1,k_2}$ be the number of these events which are near (within $10$ time points) of an event classified as $k_2$. Let $0<p_{con}\leq 1$ be a \emph{coincidence} threshold (e.g., $p_{con}=0.5$). If $n_{k_1,k_2}>\tau_{con} n_{k_1}$ or $n_{k_1,k_2}>\tau_{con} n_{k_2}$, then we consider $k_1$ and $k_2$ to represent the same neuron and therefore we eliminate either $k_1$ or $k_2$, whichever occurs with less frequency.
+
+Note that \emph{consolidation} is different from \emph{merging}. Merging denotes taking a union of two sets of events, whereas our consolidation simply involves deleting a cluster. This makes sense because we are handling the situation where two clusters (occurring on different channels) actually represent the same neuron, and one can therefore be deleted.
 
 \end{document}
