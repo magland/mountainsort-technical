@@ -179,4 +179,14 @@ The above heuristic handles most redundancies without the need to compare wavefo
 
 Note that \emph{consolidation} is different from \emph{merging}. Merging denotes taking a union of two sets of events, whereas our consolidation simply involves deleting a cluster. This makes sense because we are handling the situation where two clusters (occurring on different channels) actually represent the same neuron, and one can therefore be deleted.
 
+\section{Reliability measures}
+
+\subsection{Detectibility}
+
+Let $v$ be the central waveform for a cluster. Consider two sets $\tilde{A}_S=\{v+w:w\in W\}$ and $\tilde{A}_N=\{w:w\in W\}$. We want to know how well we can distinguish between these two sets. The best linear discriminator [do we know this?] is the inner product with $v$. Let $A_S$ and $A_N$ be the set of inner products of $v$ with $A_S$ and $A_N$, respectively.
+
+Suppose that the a noise vector $w$ is drawn from a multivariate normal distribution with covariance matrix $\Sigma$. Then $v\cdot w$ will be Gaussian
+
+Assuming a Gaussian distribution of noise, we know that $A_S$ and $A_N$ are also Gaussian distributed with standard
+
 \end{document}
